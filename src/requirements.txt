@@ -1,0 +1,5 @@
+botocore==1.12.71
+slackclient==1.3.0
+requests==2.20.1
+boto3==1.9.71
+beautifulsoup4==4.7.0

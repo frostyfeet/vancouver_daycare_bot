@@ -1,2 +1,3 @@
-# vancouver_daycare_bot
-Let's you know when there is a vacancy
+# daycare -> Slack Lambda
+
+Lambda integration for filtering daycare events and send alerts to Slack

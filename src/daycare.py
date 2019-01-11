@@ -5,10 +5,20 @@ import hashlib
 import vch
 import pickle
 import datetime
+import boto3
+from botocore.exceptions import ClientError
 from slackclient import SlackClient
 
 
-slack_token = 'xoxb-283077493317-419710139463-UBZZ5CNZuqIDVQWzeJ9WULar'
+client = boto3.client('s3')
+s3_bucket = "temp-lambda-files"
+filename = "dict.pickle"
+path = "/tmp/"
+full_path = "{}{}".format(path, filename)
+
+
+
+slack_token = ''
 
 urls = [
     "http://maps.gov.bc.ca//arcgis/rest/services/mcf/ccf/MapServer/1/query?f=json&returnGeometry=true&spatialRel=esriSpatialRelIntersects&geometry=%7B%22xmin%22%3A-13498059.020913355%2C%22ymin%22%3A6206972.077885551%2C%22xmax%22%3A-13790653.122172846%2C%22ymax%22%3A6414377.976626059%2C%22spatialReference%22%3A%7B%22wkid%22%3A102100%7D%7D&geometryType=esriGeometryEnvelope&inSR=102100&outFields=*&outSR=10210",
@@ -32,14 +42,19 @@ def send_slack(content):
         )
 
 def create_pickle_file(data):
-    pickle_out = open("dict.pickle", "wb")
-    pickle.dump(data, pickle_out)
-    pickle_out.close()
+    try:
+        pickle_out = open(full_path, "wb")
+        pickle.dump(data, pickle_out)
+        pickle_out.close()
+        client.upload_file(full_path, s3_bucket, filename)
+    except ClientError:
+        print("Error creating key")
 
 
 def check_new_listing(data):
     try:
-        pickle_in = open("dict.pickle", "rb")
+        client.download_file(s3_bucket, filename, full_path)
+        pickle_in = open(full_path, "rb")
         old_listings = pickle.load(pickle_in)
         # comparing dics
         if data == old_listings:
@@ -51,14 +66,12 @@ def check_new_listing(data):
                     send_slack(val)
                     print("New daycare found")
 
-            pickle_out = open("dict.pickle", "wb")
-            pickle.dump(data, pickle_out)
-            pickle_out.close()
+            create_pickle_file(data)
             print("{} - New daycares found".format(datetime.datetime.now()))
             return True
-    except Exception:
-    #except FileNotFoundError as e:
-        print("File not found, creating it")
+    except ClientError as ex:
+        print("Error: {}".format(ex))
+        print("Creating picke file")
         create_pickle_file(data)
         return True
 
@@ -82,17 +95,17 @@ def list_daycares(url):
                 'website': daycare['attributes']['WEBSITE_URL'],
                 'latitude': daycare['attributes']['LATITUDE'],
                 'longitude': daycare['attributes']['LONGITUDE']
-            } 
+            }
     return daycares
 
 
 def filter_daycares(daycares, minx, maxx, miny, maxy):
-    temp = {} 
+    temp = {}
     for key, val in daycares.items():
         if minx < val['longitude'] and val['longitude'] < maxx:
             if miny < val['latitude'] and val['latitude'] < maxy:
                 temp[key] = val
-    return temp 
+    return temp
 
 
 def print_daycares(daycare):
@@ -102,12 +115,11 @@ def print_daycares(daycare):
         send_slack("{}, {} {} {} {} {} {}".format(daycare['name'], daycare['address'], daycare['email'], daycare['last_update'], vch_data['infractions'], vch_data['critical-infractions'], vch_data['capacity']))
 
 
-all_daycares = {}
-count = 0
-for url in urls:
-    all_daycares.update(list_daycares(url)) 
-    
-#unique_daycares = {v['address']:v for v in all_daycares}.values()
+def lambda_handler(event, context):
+    all_daycares = {}
+    for url in urls:
+        all_daycares.update(list_daycares(url))
 
-filtered_daycares = filter_daycares(all_daycares, -123.193, -123.10, 49.257, 49.289)
-check_new_listing(filtered_daycares)
+    filtered_daycares = filter_daycares(all_daycares, -123.193, -123.10, 49.257, 49.289)
+    check_new_listing(filtered_daycares)
+    
