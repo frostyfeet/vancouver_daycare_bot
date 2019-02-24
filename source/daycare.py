@@ -123,3 +123,5 @@ def lambda_handler(event, context):
     filtered_daycares = filter_daycares(all_daycares, -123.193, -123.10, 49.257, 49.289)
     check_new_listing(filtered_daycares)
     
+
+#lambda_handler("", "")

@@ -30,18 +30,6 @@ resource "aws_cloudwatch_event_target" "daycare_to_lambda" {
   arn  = "${aws_lambda_function.daycare_lambda.arn}"
 }
 
-resource "aws_kms_key" "daycare_lambda_kms_key" {
-  description = "Encryption key for daycare slack lambda configuration"
-
-  tags {
-    "Name"        = "daycare-slack-lambda-${var.env}"
-    "Contact"     = "${var.contact}"
-    "Service"     = "${var.service}"
-    "Description" = "Managed via Terraform"
-    "Environment" = "${var.env}"
-  }
-}
-
 resource "aws_lambda_function" "daycare_lambda" {
   filename         = "./build/lambda.zip"
   function_name    = "daycare_lambda"
